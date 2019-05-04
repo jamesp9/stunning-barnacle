@@ -1,0 +1,23 @@
+#!/bin/bash
+set -u
+
+source common
+
+TEMPLATE_FILE="environment_${ENV}.json"
+
+create_ssh_keypair
+
+printf "Importing SSH Public key to EC2 ...\n"
+aws --region "${REGION}" \
+    ec2 import-key-pair \
+    --key-name "${SSH_KEYNAME}"  \
+    --public-key-material file://"${SSH_KEYNAME}".pub || printf "SSH key already imported\n"
+
+./validate_template "${TEMPLATE_FILE}"
+
+aws --region "${REGION}" \
+    cloudformation create-stack \
+    --stack-name "${STACK_NAME}" \
+    --template-body file://"${TEMPLATE_FILE}"
+
+printf "Check CloudFormation Output once stack creation is complete.\n"

@@ -1,0 +1,11 @@
+#!/bin/bash
+set -u
+
+source common
+
+TEMPLATE_FILE="${1}"
+
+aws --region "${REGION}" \
+    cloudformation validate-template \
+    --template-body file://"${TEMPLATE_FILE}"
+

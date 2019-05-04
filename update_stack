@@ -1,0 +1,15 @@
+#!/bin/bash
+set -u
+
+source common
+
+TEMPLATE_FILE="environment_${ENV}.json"
+
+create_ssh_keypair
+
+./validate_template "${TEMPLATE_FILE}"
+
+aws --region "${REGION}" \
+    cloudformation update-stack \
+    --stack-name "${STACK_NAME}" \
+    --template-body file://"${TEMPLATE_FILE}"

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+REGION="${REGION:-ap-southeast-2}"
+STACK_NAME="techtest-${ENV}"
+SSH_KEYNAME="techtest"
+
+trap on_error ERR
+
+function on_error() {
+    EXIT_STATUS=$?
+    printf "ERROR: Last command(%s): %s\n" "${EXIT_STATUS}" "${BASH_COMMAND}"
+    exit "${EXIT_STATUS}"
+}
+
+function create_ssh_keypair() {
+    if [ ! -f "${SSH_KEYNAME}.pub" ]; then
+        printf "Generating SSH key ...\n"
+        printf "n\n" | ssh-keygen -f "${SSH_KEYNAME}" -P "" -q
+    fi
+}

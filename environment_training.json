@@ -1,0 +1,266 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "James Pinkster - Tech test for Momenton",
+
+  "Metadata": {},
+
+  "Parameters": {
+    "EnvironmentName": {
+      "Description" : "Environment name throughout",
+      "Type" : "String",
+      "Default": "training"
+    },
+
+    "ProjectName": {
+      "Description" : "The project name used throughout",
+      "Type" : "String",
+      "Default": "techtest"
+    },
+
+    "KeyName" : {
+      "Description" : "Name of an existing Amazon EC2 key pair for SSH access",
+      "Default" : "techtest",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
+    },
+
+    "InstanceType" : {
+      "Description" : "EC2 instance type",
+      "Type" : "String",
+      "Default" : "t3.micro"
+    },
+
+    "SSHLocation" : {
+      "Description" : " IP address range allowed to access SSH.",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default": "59.167.177.46/32",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+    }
+  },
+
+  "Mappings": {
+    "RegionAMIMap": {
+      "ap-southeast-2": {"AMI": "ami-04481c741a0311bbb"}
+    }
+  },
+
+  "Conditions": {},
+
+  "Resources": {
+    "VPC": {
+      "Type" : "AWS::EC2::VPC",
+      "Properties" : {
+        "EnableDnsSupport":true,
+        "EnableDnsHostnames":true,
+        "CidrBlock": "10.8.0.0/16",
+        "Tags": [
+          {"Key": "Name", "Value": {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]]}
+          },
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+
+    "PublicSubnet01" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "CidrBlock" : "10.8.1.0/24",
+        "AvailabilityZone" : {"Fn::Join": ["", [{ "Ref" : "AWS::Region" }, "a"]]},
+        "MapPublicIpOnLaunch":true,
+        "Tags" : [
+          {"Key" : "Name","Value" : {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]]}
+          },
+          {"Key" : "subnet_visibility", "Value" : "public" },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+
+    "InternetGateway": {
+      "Type" : "AWS::EC2::InternetGateway",
+      "Properties" : {
+        "Tags" : [
+          {"Key" : "Name", "Value" : {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]]}
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+    "AttachInternetGateway" : {
+      "Type" : "AWS::EC2::VPCGatewayAttachment",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "InternetGatewayId" : { "Ref" : "InternetGateway" }
+      }
+    },
+
+    "RouteTable" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "Tags" : [
+          {"Key" : "Name", "Value" : {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]]}
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+    "InternetRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "RouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "InternetGateway" }
+      }
+    },
+    "publicSubnetRouteTableAssociation" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "PublicSubnet01" },
+        "RouteTableId" : { "Ref" : "RouteTable" }
+      }
+    },
+
+    "AppServerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable HTTP access via port 80 locked down to the load balancer + SSH access",
+        "VpcId" : {"Ref" : "VPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 8080,
+            "ToPort": 8080,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIp": {
+              "Ref": "SSHLocation"
+            }
+          }
+        ],
+        "Tags" : [
+          {"Key" : "Name", "Value" : {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]]}
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+
+    "AppServer": {
+      "Type": "AWS::EC2::Instance",
+      "Metadata" : {
+        "AWS::CloudFormation::Init" : {
+          "config" : {
+            "packages" : {
+              "yum": {
+                "tomcat": []
+              }
+            },
+            "files" : {
+              "/usr/share/tomcat/webapps/sample.war": {
+                "source": "https://tomcat.apache.org/tomcat-7.0-doc/appdev/sample/sample.war",
+                "group": "tomcat",
+                "owner": "tomcat",
+                "mode" : "000644"
+              }
+            },
+            "services" : {
+              "sysvinit": {
+                "tomcat": {
+                  "enabled": "true",
+                  "ensureRunning": "true",
+                  "files": ["/usr/share/tomcat/webapps/sample.war"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "ImageId": {
+          "Fn::FindInMap": [
+            "RegionAMIMap",
+            { "Ref" : "AWS::Region" },
+            "AMI"
+          ]
+        },
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "SubnetId": {"Ref" : "PublicSubnet01"},
+        "SecurityGroupIds": [
+          { "Ref": "AppServerSecurityGroup"}
+        ],
+        "KeyName": {
+          "Ref": "KeyName"
+        },
+        "UserData" : { "Fn::Base64" :
+          { "Fn::Join" : ["", [
+            "#!/bin/bash -xe\n",
+            "yum update -y\n",
+            "yum install -y aws-cfn-bootstrap\n",
+            "# Install the files and packages from the metadata\n",
+            "/opt/aws/bin/cfn-init -v ",
+            "         --stack ", { "Ref" : "AWS::StackName" },
+            "         --resource AppServer ",
+            "         --region ", { "Ref" : "AWS::Region" }, "\n"
+          ]]}
+        },
+
+        "Tags" : [
+          {"Key" : "Name","Value" : {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"},
+            {"Ref": "EnvironmentName"},
+            "app"]]}
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    }
+  },
+
+  "Outputs": {
+    "VPCId": {
+      "Value": {"Ref": "VPC"},
+      "Description": "VPC for training environment"
+    },
+    "EC2PublicIP": {
+      "Value": { "Fn::GetAtt" : [ "AppServer", "PublicIp" ] },
+      "Description": "EC2 instance public IP address"
+    },
+    "EC2PrivateIP": {
+      "Value": { "Fn::GetAtt" : [ "AppServer", "PrivateIp" ] },
+      "Description": "EC2 instance VPC private IP address"
+    },
+    "URL": {
+      "Value": {
+        "Fn::Join": ["", [
+          "http://",
+          { "Fn::GetAtt" : [ "AppServer", "PublicIp" ] },
+          ":8080/sample/"
+        ]]
+      },
+      "Description": "EC2 instance VPC private IP address"
+    }
+  }
+}

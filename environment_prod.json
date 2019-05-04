@@ -1,0 +1,601 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "James Pinkster - Tech test for Momenton",
+
+  "Metadata": {},
+
+  "Parameters": {
+    "EnvironmentName": {
+      "Description" : "Environment name to use in template",
+      "Type" : "String",
+      "Default": "prod"
+    },
+
+    "ProjectName": {
+      "Description" : "The project name to use in template",
+      "Type" : "String",
+      "Default": "techtest"
+    },
+
+    "KeyName" : {
+      "Description" : "Name of an existing Amazon EC2 key pair for SSH access",
+      "Default" : "techtest",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
+    },
+
+    "InstanceType" : {
+      "Description" : "EC2 instance type",
+      "Type" : "String",
+      "Default" : "t3.micro"
+    },
+
+    "SSHLocation" : {
+      "Description" : " IP address range allowed to access SSH.",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default": "59.167.177.46/32",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+    }
+  },
+
+  "Mappings": {
+    "RegionAMIMap": {
+      "ap-southeast-2": {"AMI": "ami-04481c741a0311bbb"}
+    }
+  },
+
+  "Conditions": {},
+
+  "Resources": {
+    "VPC": {
+      "Type" : "AWS::EC2::VPC",
+      "Properties" : {
+        "EnableDnsSupport":true,
+        "EnableDnsHostnames":true,
+        "CidrBlock": "10.9.0.0/16",
+        "Tags": [
+          {"Key": "Name", "Value": {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]]}
+          },
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+
+    "PublicSubnet01" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "CidrBlock" : "10.9.1.0/24",
+        "AvailabilityZone" : {"Fn::Join": ["", [{ "Ref" : "AWS::Region" }, "a"]]},
+        "MapPublicIpOnLaunch":true,
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "public"
+              ]]
+            }
+          },
+          {"Key" : "subnet_visibility", "Value" : "public" },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+    "PublicSubnet02" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "CidrBlock" : "10.9.2.0/24",
+        "AvailabilityZone" : {"Fn::Join": ["", [{ "Ref" : "AWS::Region" }, "b"]]},
+        "MapPublicIpOnLaunch":true,
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "public"
+              ]]
+            }
+          },
+          {"Key" : "subnet_visibility", "Value" : "public" },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+    "PrivateSubnet01" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "CidrBlock" : "10.9.5.0/24",
+        "AvailabilityZone" : {"Fn::Join": ["", [{ "Ref" : "AWS::Region" }, "a"]]},
+        "MapPublicIpOnLaunch":false,
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "private"
+              ]]
+            }
+          },
+          {"Key" : "subnet_visibility", "Value" : "private" },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+    "PrivateSubnet02" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "CidrBlock" : "10.9.6.0/24",
+        "AvailabilityZone" : {"Fn::Join": ["", [{ "Ref" : "AWS::Region" }, "b"]]},
+        "MapPublicIpOnLaunch":false,
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "private"
+              ]]
+            }
+          },
+          {"Key" : "subnet_visibility", "Value" : "private" },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+
+    "InternetGateway": {
+      "Type" : "AWS::EC2::InternetGateway",
+      "Properties" : {
+        "Tags" : [
+          {"Key" : "Name", "Value" : {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]]}
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+    "AttachInternetGateway" : {
+      "Type" : "AWS::EC2::VPCGatewayAttachment",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "InternetGatewayId" : { "Ref" : "InternetGateway" }
+      }
+    },
+
+    "RouteTable" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "Tags" : [
+          {"Key" : "Name", "Value" : {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]]}
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+    "InternetRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "RouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "InternetGateway" }
+      }
+    },
+    "publicSubnetRouteTableAssociation01" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "PublicSubnet01" },
+        "RouteTableId" : { "Ref" : "RouteTable" }
+      }
+    },
+    "publicSubnetRouteTableAssociation02" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "PublicSubnet02" },
+        "RouteTableId" : { "Ref" : "RouteTable" }
+      }
+    },
+
+    "PrivateRouteTable01" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "private",
+                "01"
+              ]]
+            }
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+    "PrivateRouteTable02" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "private",
+                "02"
+              ]]
+            }
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+
+    "EIP01" : {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : "vpc"
+      }
+    },
+    "NATGateway01": {
+      "Type" : "AWS::EC2::NatGateway",
+      "Properties" : {
+        "AllocationId" : { "Fn::GetAtt" : ["EIP01", "AllocationId"]},
+        "SubnetId" : {"Ref" : "PublicSubnet01"},
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "01"
+              ]]
+            }
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+
+    "EIP02" : {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : "vpc"
+      }
+    },
+    "NATGateway02": {
+      "Type" : "AWS::EC2::NatGateway",
+      "Properties" : {
+        "AllocationId" : { "Fn::GetAtt" : ["EIP02", "AllocationId"]},
+        "SubnetId" : {"Ref" : "PublicSubnet02"},
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "02"
+              ]]
+            }
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+
+    "PrivateInternetRoute01" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivateRouteTable01" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "NatGatewayId" : { "Ref" : "NATGateway01" }
+      }
+    },
+    "PrivateInternetRoute02" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivateRouteTable02" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "NatGatewayId" : { "Ref" : "NATGateway02" }
+      }
+    },
+
+    "privateSubnetRouteTableAssociation01" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "PrivateSubnet01" },
+        "RouteTableId" : { "Ref" : "PrivateRouteTable01" }
+      }
+    },
+    "privateSubnetRouteTableAssociation02" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "PrivateSubnet02" },
+        "RouteTableId" : { "Ref" : "PrivateRouteTable02" }
+      }
+    },
+
+    "ASG": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "VPCZoneIdentifier": [
+          {"Ref" : "PrivateSubnet01"},
+          {"Ref" : "PrivateSubnet02"}
+        ],
+        "LaunchConfigurationName": {
+          "Ref": "LaunchConfig"
+        },
+        "MinSize": "2",
+        "DesiredCapacity": "2",
+        "MaxSize": "4",
+        "TargetGroupARNs": [{ "Ref": "ALBTargetGroup"}],
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": [
+                "-",
+                [{"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]
+              ]
+            },
+            "PropagateAtLaunch":true
+          },
+          {
+            "Key": "environment",
+            "Value": {"Ref": "EnvironmentName"},
+            "PropagateAtLaunch":true
+          },
+          {
+            "Key": "Project",
+            "Value": {"Ref": "ProjectName"},
+            "PropagateAtLaunch":true
+          }
+        ]
+      },
+      "CreationPolicy": {
+        "ResourceSignal": {
+          "Timeout": "PT15M"
+        }
+      },
+      "UpdatePolicy": {
+        "AutoScalingRollingUpdate": {
+          "MinInstancesInService": 1,
+          "MaxBatchSize": 1,
+          "PauseTime": "PT15M",
+          "WaitOnResourceSignals":true
+        }
+      }
+    },
+
+    "LaunchConfig": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Metadata": {
+        "Comment": "Install example tomcat",
+        "AWS::CloudFormation::Init": {
+          "config": {
+            "packages": {
+              "yum": {
+                "tomcat": []
+              }
+            },
+            "files": {
+              "/usr/share/tomcat/webapps/sample.war": {
+                "source": "https://tomcat.apache.org/tomcat-7.0-doc/appdev/sample/sample.war",
+                "group": "tomcat",
+                "owner": "tomcat",
+                "mode" : "000644"
+              }
+            },
+            "services": {
+              "sysvinit": {
+                "tomcat": {
+                  "enabled": "true",
+                  "ensureRunning": "true",
+                  "files": ["/usr/share/tomcat/webapps/sample.war"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "ImageId": {
+          "Fn::FindInMap": [
+            "RegionAMIMap",
+            { "Ref" : "AWS::Region" },
+            "AMI"
+          ]
+        },
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "KeyName": {
+          "Ref": "KeyName"
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "AppServerSecurityGroup"
+          }
+        ],
+        "UserData": {"Fn::Base64": {
+          "Fn::Join": ["", [
+            "#!/bin/bash -xe\n",
+            "yum install -y aws-cfn-bootstrap\n",
+            "# Install the files and packages from the metadata\n",
+            "/opt/aws/bin/cfn-init -v ",
+            "         --stack ", { "Ref" : "AWS::StackName" },
+            "         --resource LaunchConfig ",
+            "         --region ", { "Ref" : "AWS::Region" }, "\n",
+
+             "# Signal the status from cfn-init\n",
+             "/opt/aws/bin/cfn-signal -e $? ",
+             "         --stack ", { "Ref" : "AWS::StackName" },
+             "         --resource ASG ",
+             "         --region ", { "Ref" : "AWS::Region" }, "\n"
+          ]]}
+        }
+      }
+    },
+
+    "AppServerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Allow access within VPC",
+        "VpcId" : {"Ref" : "VPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 8080,
+            "ToPort": 8080,
+            "CidrIp": {"Fn::GetAtt" : ["VPC", "CidrBlock"]}
+          }
+        ],
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "from-vpc"
+              ]]
+            }
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+    "LBSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Allow access from internet",
+        "VpcId" : {"Ref" : "VPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : {
+              "Fn::Join": ["-", [
+                {"Ref": "ProjectName"},
+                {"Ref": "EnvironmentName"},
+                "from-internet-web"
+              ]]
+            }
+          },
+          {"Key": "environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+        ]
+      }
+    },
+
+    "ApplicationLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+        "Subnets": [
+          {"Ref": "PublicSubnet01"},
+          {"Ref": "PublicSubnet02"}
+        ],
+        "SecurityGroups": [{"Ref": "LBSecurityGroup"}]
+      }
+    },
+    "ALBListener": {
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties": {
+        "DefaultActions": [
+          {
+            "Type": "forward",
+            "TargetGroupArn": {
+              "Ref": "ALBTargetGroup"
+            }
+          }
+        ],
+        "LoadBalancerArn": {
+          "Ref": "ApplicationLoadBalancer"
+        },
+        "Port": 80,
+        "Protocol": "HTTP"
+      }
+    },
+    "ALBTargetGroup": {
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties": {
+        "HealthCheckPath": "/sample/",
+        "HealthCheckTimeoutSeconds": 5,
+        "HealthyThresholdCount": 3,
+        "Port": 8080,
+        "Protocol": "HTTP",
+        "UnhealthyThresholdCount": 5,
+        "VpcId": {"Ref": "VPC"},
+        "Tags": [
+          {"Key": "Name", "Value": {"Fn::Join": ["-", [
+            {"Ref": "ProjectName"}, {"Ref": "EnvironmentName"}]]}
+          },
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "Project", "Value": {"Ref": "ProjectName"}}
+
+        ]
+      }
+    }
+  },
+
+  "Outputs": {
+    "VPCId": {
+      "Value": {"Ref": "VPC"},
+      "Description": "VPC ID"
+    },
+    "URL": {
+      "Value": {
+        "Fn::Join": ["", [
+          "http://",
+          { "Fn::GetAtt" : [ "ApplicationLoadBalancer", "DNSName" ] },
+          "/sample/"
+        ]]
+      },
+      "Description": "Load balancer DNS name"
+    }
+  }
+}
